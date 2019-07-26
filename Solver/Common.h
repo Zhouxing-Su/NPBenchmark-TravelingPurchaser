@@ -24,6 +24,8 @@ using Length = int;
 using Coord = Length;
 // the unit of costs for traveling and purchase.
 using Price = int;
+// the unit of product amount.
+using Quantity = int;
 // the unit of elapsed computational time.
 using Duration = int;
 // number of neighborhood moves in local search.

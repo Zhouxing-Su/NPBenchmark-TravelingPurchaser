@@ -51,6 +51,8 @@ namespace szx {
 #define RESOLVED_CONCAT3(a, b, c, d)  VERBATIM_CONCAT3(a, b, c, d)
 
 
+#ifndef SMART_SZX_CPP_UTILIBS_ARR
+#define SMART_SZX_CPP_UTILIBS_ARR
 template<typename T, typename IndexType = int>
 class Arr {
 public:
@@ -275,6 +277,7 @@ protected:
     IndexType len2;
     IndexType len;
 };
+#endif // !SMART_SZX_CPP_UTILIBS_ARR
 
 
 class Random {
@@ -595,6 +598,79 @@ public:
     std::vector<ArbitraryId> idList;
     // idMap[arbitraryId] == consecutiveId.
     std::map<ArbitraryId, ConsecutiveId> idMap;
+};
+
+
+class ConsecutiveIdSet {
+public:
+    using Index = int;
+    using Item = Index;
+
+
+    static constexpr Index InvalidIndex = -1;
+
+
+    ConsecutiveIdSet(Index capacity, Item minValue = 0)
+        : lowerBound(minValue), upperBound(minValue + capacity - 1), itemNum(0),
+        items(capacity), index(capacity, InvalidIndex) {
+    }
+
+
+    // if the item has been inserted, return true.
+    bool isItemExist(Item e) const { return (index[e - lowerBound] != InvalidIndex); }
+    // if the item is in range [min, max], return true.
+    bool isItemValid(Item e) const { return ((e <= upperBound) && (e >= lowerBound)); }
+    // if the index is in range [0, elementNum), return true.
+    bool isIndexValid(Index i) const { return ((i >= 0) && (i < itemNum)); }
+
+    // insert item e and update index.
+    void insert(Item e) {
+        items[itemNum] = e;
+        index[e - lowerBound] = itemNum;
+        ++itemNum;
+    }
+    // return item at the index of i.
+    Item itemAt(Index i) const { return items[i]; }
+    // return index of item e.
+    Index indexOf(Item e) const { return index[e - lowerBound]; }
+    // remove item and update index.
+    void eraseElement(Item e) {
+        Index i = index[e - lowerBound];
+        --itemNum;
+        index[items[itemNum] - lowerBound] = i;
+        items[i] = items[itemNum];
+        index[e - lowerBound] = InvalidIndex;
+    }
+    // remove index and update item.
+    void eraseIndex(Index i) {
+        Item e = items[i];
+        --itemNum;
+        index[items[itemNum] - lowerBound] = i;
+        items[i] = items[itemNum];
+        index[e - lowerBound] = InvalidIndex;
+    }
+
+    // return number of inserted items.
+    Index size() const { return itemNum; }
+
+    // keep the capacity but invalidate all items and reset the size.
+    void clear() {
+        index.reset(Arr<Index>::ResetOption::AllBits1);
+        itemNum = 0;
+    }
+    // OPTIMIZE[szx][5]: this implementation may be more efficient for a sparse data set.
+    //void clear() {
+    //    for (Index i = 0; i < itemNum; ++i) { index[items[i] - lowerBound] = InvalidIndex; }
+    //    itemNum = 0;
+    //}
+
+protected:
+    Item lowerBound; // min value of items.
+    Item upperBound; // max value of items.
+
+    Index itemNum; // current number of items.
+    Arr<Item> items; // items value, itemNum valid items in it.
+    Arr<Index> index; // items index in item.
 };
 
 

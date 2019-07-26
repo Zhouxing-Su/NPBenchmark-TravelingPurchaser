@@ -27,6 +27,7 @@ struct LogSwitch {
         Model = Log::Level::Info,
         MpSolver = Log::Level::On,
         Checker = Log::Level::On,
+        Reduction = Log::Level::On,
     };
 };
 

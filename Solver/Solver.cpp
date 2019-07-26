@@ -10,6 +10,8 @@
 
 #include <cmath>
 
+#include "../Lib/LKH3Lib/TspSolver.h"
+
 
 using namespace std;
 
@@ -278,9 +280,8 @@ bool Solver::optimize(Solution &sln, ID workerId) {
     // reset solution state.
     bool status = true;
 
-    // TODO[0]: replace the following random assignment with your own algorithm.
-    status = optimizeByRandomAssignment(sln);
-    //status = optimizeByXXX(sln);
+    //status = optimizeByRandomAssignment(sln);
+    status = optimizeShortestSimplePathWithMustPassNodesByReduction(sln);
 
     Log(LogSwitch::Szx::Framework) << "worker " << workerId << " ends." << endl;
     return status;
@@ -309,6 +310,47 @@ bool Solver::optimizeByRandomAssignment(Solution &sln) {
 
     sln.cost = routingCost + purchaseCost; // record obj.
     return true;
+}
+
+bool Solver::optimizeShortestSimplePathWithMustPassNodesByReduction(Solution &sln) {
+    ID nodeNum = input.graph().nodes().size();
+
+    List<ID> demandProviders(input.demands().size(), Problem::InvalidId);
+
+    ConsecutiveIdSet mustPassNodes(nodeNum);
+    for (ID n = 0; n < nodeNum; ++n) {
+        auto &node(input.graph().nodes(n));
+        if (node.supplies().empty()) { continue; }
+        auto &supply(*node.supplies().begin());
+
+        if ((node.supplies().size() > 1) // provide single product.
+            || (supply.second.quantity() < input.demands(supply.first)) // fulfill the demand at single visit.
+            || (demandProviders[supply.first] > Problem::InvalidId)) { // no one else provides the same product.
+            Log(LogSwitch::Szx::Reduction) << "[error] this problem can not be regarded as shortest simple path problem with must-pass nodes." << endl;
+            return false;
+        }
+        demandProviders[supply.first] = n;
+
+        mustPassNodes.insert(n);
+    }
+
+    ID virtualNodeNum = (2 * nodeNum) - mustPassNodes.size() - 1;
+
+    Arr2D<Price> adjMat(virtualNodeNum, virtualNodeNum);
+    adjMat.reset(Arr2D<Price>::ResetOption::SafeMaxInt); // TODO[szx][9]: make sure the `Price` is integer type, or use the following line to init.
+    //fill(adjMat.begin(), adjMat.end(), Problem::MaxCost);
+
+    // TODO[0]: do the reduction.
+
+    lkh::Tour tour;
+    if (lkh::solveTsp(tour, adjMat)) {
+        sln.cost = tour.distance; // record obj.
+
+        auto &path(*sln.mutable_path());
+        // TODO[szx][0]: retrieve solution.
+    }
+
+    return false;
 }
 #pragma endregion Solver
 

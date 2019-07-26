@@ -200,6 +200,7 @@ protected:
     bool optimize(Solution &sln, ID workerId = 0); // optimize by a single worker.
 
     bool optimizeByRandomAssignment(Solution &sln);
+    bool optimizeShortestSimplePathWithMustPassNodesByReduction(Solution &sln);
     #pragma endregion Method
 
     #pragma region Field
