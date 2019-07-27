@@ -235,6 +235,8 @@ void Simulator::convertSsppmpnInstance(const String &ssppmpnPath, int index) {
             edge.set_cost(e->cost());
         } else {
             Log(Log::Warning) << "duplicated edge " << e->src() << "-" << e->dst() << endl;
+            auto &edge(*graph.mutable_edges(edgeIndices.at(e->src(), e->dst())));
+            if (e->cost() < edge.cost()) { edge.set_cost(e->cost()); }
         }
     }
 
