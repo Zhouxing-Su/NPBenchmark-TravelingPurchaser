@@ -313,9 +313,11 @@ bool Solver::optimizeByRandomAssignment(Solution &sln) {
 }
 
 bool Solver::optimizeShortestSimplePathWithMustPassNodesByReduction(Solution &sln) {
+    Log(LogSwitch::Szx::Reduction) << "reduction starts." << endl;
     ID nodeNum = input.graph().nodes().size();
 
-    List<ID> demandProviders(input.demands().size(), Problem::InvalidId);
+    List<ID> productProviders(input.demands().size(), Problem::InvalidId);
+    List<ID> providedProducts(input.graph().nodes().size(), Problem::InvalidId);
 
     ConsecutiveIdSet mustPassNodes(nodeNum);
     for (ID n = 0; n < nodeNum; ++n) {
@@ -325,11 +327,12 @@ bool Solver::optimizeShortestSimplePathWithMustPassNodesByReduction(Solution &sl
 
         if ((node.supplies().size() > 1) // provide single product.
             || (supply.second.quantity() < input.demands(supply.first)) // fulfill the demand at single visit.
-            || (demandProviders[supply.first] > Problem::InvalidId)) { // no one else provides the same product.
+            || (productProviders[supply.first] > Problem::InvalidId)) { // no one else provides the same product.
             Log(LogSwitch::Szx::Reduction) << "[error] this problem can not be regarded as shortest simple path problem with must-pass nodes." << endl;
             return false;
         }
-        demandProviders[supply.first] = n;
+        productProviders[supply.first] = n;
+        providedProducts[n] = supply.first;
 
         mustPassNodes.insert(n);
     }
@@ -340,14 +343,54 @@ bool Solver::optimizeShortestSimplePathWithMustPassNodesByReduction(Solution &sl
     adjMat.reset(Arr2D<Price>::ResetOption::SafeMaxInt); // TODO[szx][9]: make sure the `Price` is integer type, or use the following line to init.
     //fill(adjMat.begin(), adjMat.end(), Problem::MaxCost);
 
-    // TODO[0]: do the reduction.
+    // copy original adjacency information.
+    for (ID n = 0; n < nodeNum; ++n) {
+        for (auto m = aux.adjList[n].begin(); m != aux.adjList[n].end(); ++m) {
+            adjMat.at(n, *m) = aux.adjMat.at(n, *m);
+        }
+    }
+    //for (ID n = 0; n < nodeNum; ++n) {
+    //    for (ID m = 0; m < nodeNum; ++m) {
+    //        adjMat.at(n, m) = aux.adjMat.at(n, m);
+    //    }
+    //}
 
+    // add virtual nodes and edges.
+    ID virtualNodeId = nodeNum;
+    ID nextVirtualNodeId = nodeNum + 1;
+    adjMat.at(input.dst(), virtualNodeId) = 0;
+    for (ID n = 0; n < nodeNum; ++n) {
+        if (mustPassNodes.isItemExist(n) || (n == input.src()) || (n == input.dst())) { continue; }
+        adjMat.at(virtualNodeId, nextVirtualNodeId) = 0;
+        adjMat.at(virtualNodeId, n) = 0;
+        adjMat.at(n, nextVirtualNodeId) = 0;
+        ++virtualNodeId;
+        ++nextVirtualNodeId;
+    }
+    adjMat.at(virtualNodeId, input.src()) = 0;
+
+    Log(LogSwitch::Szx::Reduction) << "start solving reduced problem." << endl;
     lkh::Tour tour;
     if (lkh::solveTsp(tour, adjMat)) {
+        Log(LogSwitch::Szx::Reduction) << "retrieving solution." << endl;
         sln.cost = tour.distance; // record obj.
 
         auto &path(*sln.mutable_path());
-        // TODO[szx][0]: retrieve solution.
+        auto n = tour.nodes.begin();
+        bool isDstBeforeSrc = false;
+        for (; *n != input.src(); ++n) { isDstBeforeSrc |= (*n == input.dst()); }
+        if (isDstBeforeSrc) {
+            rotate(tour.nodes.begin(), n, tour.nodes.end());
+            n = tour.nodes.begin();
+        }
+        for (ID prevNode = input.src(); prevNode != input.dst(); prevNode = *n, ++n) {
+            pb::TravelingPurchaser::Purchase &purchase(*path.Add());
+            purchase.set_node(*n);
+            if (providedProducts[*n] <= Problem::InvalidId) { continue; }
+            auto &quantities(*purchase.mutable_quantities());
+            quantities[providedProducts[*n]] = input.demands(providedProducts[*n]);
+        }
+        return true;
     }
 
     return false;
