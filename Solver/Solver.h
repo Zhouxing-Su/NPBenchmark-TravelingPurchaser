@@ -211,6 +211,7 @@ public:
     struct { // auxiliary data for solver.
         List<List<ID>> adjList; // adjList[i][j] is the j_th adjacent node of node i.
         Arr2D<Price> adjMat; // adjMat[i][j] is the cost between node i and j.
+        Price maxEdgeCost;
     } aux;
 
     Environment env;

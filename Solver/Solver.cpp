@@ -267,10 +267,12 @@ void Solver::init() {
     aux.adjMat.init(nodeNum, nodeNum);
     aux.adjMat.reset(Arr2D<Price>::ResetOption::SafeMaxInt); // TODO[szx][9]: make sure the `Price` is integer type, or use the following line to init.
     //fill(aux.adjMat.begin(), aux.adjMat.end(), Problem::MaxCost);
+    aux.maxEdgeCost = 0;
     for (auto e = input.graph().edges().begin(); e != input.graph().edges().end(); ++e) {
         // assume there is no duplicated edge.
         aux.adjList.at(e->src()).push_back(e->dst());
         aux.adjMat.at(e->src(), e->dst()) = e->cost();
+        if (aux.maxEdgeCost < e->cost()) { aux.maxEdgeCost = e->cost(); }
     }
 }
 
@@ -344,9 +346,10 @@ bool Solver::optimizeShortestSimplePathWithMustPassNodesByReduction(Solution &sl
     //fill(adjMat.begin(), adjMat.end(), Problem::MaxCost);
 
     // copy original adjacency information.
+    Price costAmp = virtualNodeNum;
     for (ID n = 0; n < nodeNum; ++n) {
         for (auto m = aux.adjList[n].begin(); m != aux.adjList[n].end(); ++m) {
-            adjMat.at(n, *m) = aux.adjMat.at(n, *m);
+            adjMat.at(n, *m) = aux.adjMat.at(n, *m) * costAmp;
         }
     }
     //for (ID n = 0; n < nodeNum; ++n) {
@@ -358,22 +361,22 @@ bool Solver::optimizeShortestSimplePathWithMustPassNodesByReduction(Solution &sl
     // add virtual nodes and edges.
     ID virtualNodeId = nodeNum;
     ID nextVirtualNodeId = nodeNum + 1;
-    adjMat.at(input.dst(), virtualNodeId) = 0;
+    adjMat.at(input.dst(), virtualNodeId) = 1;
     for (ID n = 0; n < nodeNum; ++n) {
         if (mustPassNodes.isItemExist(n) || (n == input.src()) || (n == input.dst())) { continue; }
-        adjMat.at(virtualNodeId, nextVirtualNodeId) = 0;
-        adjMat.at(virtualNodeId, n) = 0;
-        adjMat.at(n, nextVirtualNodeId) = 0;
+        adjMat.at(virtualNodeId, nextVirtualNodeId) = 1;
+        adjMat.at(virtualNodeId, n) = 1;
+        adjMat.at(n, nextVirtualNodeId) = 1;
         ++virtualNodeId;
         ++nextVirtualNodeId;
     }
-    adjMat.at(virtualNodeId, input.src()) = 0;
+    adjMat.at(virtualNodeId, input.src()) = 1;
 
     Log(LogSwitch::Szx::Reduction) << "start solving reduced problem." << endl;
     lkh::Tour tour;
     if (lkh::solveTsp(tour, adjMat)) {
         Log(LogSwitch::Szx::Reduction) << "retrieving solution." << endl;
-        sln.cost = tour.distance; // record obj.
+        sln.cost = tour.distance / costAmp; // record obj.
 
         auto &path(*sln.mutable_path());
         auto n = tour.nodes.begin();
