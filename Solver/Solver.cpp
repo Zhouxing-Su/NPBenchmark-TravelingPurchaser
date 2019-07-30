@@ -346,7 +346,7 @@ bool Solver::optimizeShortestSimplePathWithMustPassNodesByReduction(Solution &sl
     //fill(adjMat.begin(), adjMat.end(), Problem::MaxCost);
 
     // copy original adjacency information.
-    Price costAmp = virtualNodeNum;
+    Price costAmp = 1; //virtualNodeNum;
     for (ID n = 0; n < nodeNum; ++n) {
         for (auto m = aux.adjList[n].begin(); m != aux.adjList[n].end(); ++m) {
             adjMat.at(n, *m) = aux.adjMat.at(n, *m) * costAmp;
@@ -361,13 +361,13 @@ bool Solver::optimizeShortestSimplePathWithMustPassNodesByReduction(Solution &sl
     // add virtual nodes and edges.
     ID virtualNodeId = nodeNum;
     ID nextVirtualNodeId = nodeNum + 1;
-    Price virtualEdgeCost = aux.maxEdgeCost * costAmp * 2;
+    Price virtualEdgeCost = aux.maxEdgeCost * costAmp * 4;
     adjMat.at(input.dst(), virtualNodeId) = 0;
     for (ID n = 0; n < nodeNum; ++n) {
         if (mustPassNodes.isItemExist(n) || (n == input.src()) || (n == input.dst())) { continue; }
         adjMat.at(virtualNodeId, nextVirtualNodeId) = virtualEdgeCost;
-        adjMat.at(virtualNodeId, n) = virtualEdgeCost;
-        adjMat.at(n, nextVirtualNodeId) = 0;
+        adjMat.at(virtualNodeId, n) = virtualEdgeCost / 2;
+        adjMat.at(n, nextVirtualNodeId) = virtualEdgeCost / 2;
         ++virtualNodeId;
         ++nextVirtualNodeId;
     }
