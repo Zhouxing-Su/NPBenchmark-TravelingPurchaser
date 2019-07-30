@@ -361,22 +361,23 @@ bool Solver::optimizeShortestSimplePathWithMustPassNodesByReduction(Solution &sl
     // add virtual nodes and edges.
     ID virtualNodeId = nodeNum;
     ID nextVirtualNodeId = nodeNum + 1;
-    adjMat.at(input.dst(), virtualNodeId) = 1;
+    Price virtualEdgeCost = aux.maxEdgeCost * costAmp * 2;
+    adjMat.at(input.dst(), virtualNodeId) = 0;
     for (ID n = 0; n < nodeNum; ++n) {
         if (mustPassNodes.isItemExist(n) || (n == input.src()) || (n == input.dst())) { continue; }
-        adjMat.at(virtualNodeId, nextVirtualNodeId) = 1;
-        adjMat.at(virtualNodeId, n) = 1;
-        adjMat.at(n, nextVirtualNodeId) = 1;
+        adjMat.at(virtualNodeId, nextVirtualNodeId) = virtualEdgeCost;
+        adjMat.at(virtualNodeId, n) = virtualEdgeCost;
+        adjMat.at(n, nextVirtualNodeId) = 0;
         ++virtualNodeId;
         ++nextVirtualNodeId;
     }
-    adjMat.at(virtualNodeId, input.src()) = 1;
+    adjMat.at(virtualNodeId, input.src()) = 0;
 
     Log(LogSwitch::Szx::Reduction) << "start solving reduced problem." << endl;
     lkh::Tour tour;
     if (lkh::solveTsp(tour, adjMat)) {
         Log(LogSwitch::Szx::Reduction) << "retrieving solution." << endl;
-        sln.cost = tour.distance / costAmp; // record obj.
+        sln.cost = (tour.distance - (virtualEdgeCost * (virtualNodeNum - nodeNum - 1))) / costAmp; // record obj.
 
         auto &path(*sln.mutable_path());
         auto n = tour.nodes.begin();
